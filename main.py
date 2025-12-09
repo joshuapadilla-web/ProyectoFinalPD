@@ -126,7 +126,6 @@ async def predict_image(file: UploadFile = File(...)):
         - class: 0 a 2022 dependiendo de clase
         - class_name: nombre de la comida
         - confidence: probabilidad de la predicción
-        - probabilities: probabilidades para cada clase
     """
     
     # Verificar que el modelo esté cargado
