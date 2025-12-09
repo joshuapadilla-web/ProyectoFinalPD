@@ -4,6 +4,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from PIL import Image
 import tensorflow as tf
+import pandas as pd
 import io
 
 # Configurar TensorFlow para usar menos memoria
@@ -152,11 +153,12 @@ async def predict_image(file: UploadFile = File(...)):
         # Extraer resultados
         probabilities = prediction[0].tolist()
         predicted_class = int(np.argmax(prediction[0]))
-        confidence = float(np.max(prediction[0]))
+        confidence = float(np.max(prediction[0]))/2024
         
         # Mapear clase a nombre
-        class_names = {0: "horse", 1: "human"}
-        class_name = class_names[predicted_class]
+        label_map = pd.read_csv('aiy_food_V1_labelmap.csv')
+        class_name = label_map.iloc[predicted_class]['name']
+        #class_name = class_names[predicted_class]
         
         return {
             "class": predicted_class,
