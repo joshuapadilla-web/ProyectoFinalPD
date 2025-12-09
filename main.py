@@ -75,7 +75,7 @@ def preprocess_image(image: Image.Image) -> np.ndarray:
         img_array = img_array.reshape((192, 192, 3))
         
         # Convertir a float32 y normalizar
-        img_array = img_array.astype('float32') / 255.0
+        img_array = img_array.astype(np.uint8)
         
         # Agregar dimensión del batch: (1, 300, 300, 1)
         img_array = np.expand_dims(img_array, axis=0)
