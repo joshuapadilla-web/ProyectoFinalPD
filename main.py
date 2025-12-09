@@ -4,7 +4,6 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from PIL import Image
 import tensorflow as tf
-from tensorflow import keras
 import io
 
 # Configurar TensorFlow para usar menos memoria
@@ -13,26 +12,37 @@ tf.config.experimental.set_memory_growth(
 ) if tf.config.experimental.list_physical_devices('GPU') else None
 
 app = FastAPI(
-    title="Horse vs Human Classifier API",
-    description="API para clasificar imágenes entre caballos y humanos usando CNN",
+    title="Food Classifier API",
+    description="API para clasificar imágenes de comida usando CNN",
     version="1.0.0"
 )
 
-# Variable global para el modelo
-model = None
+# Variables globales para el intérprete TFLite
+interpreter = None
+input_details = None
+output_details = None
 
 def load_model():
-    """Cargar el modelo entrenado"""
-    global model
-    model_path = "horse_human_classifier.h5"
+    """Cargar el modelo TFLite"""
+    global interpreter, input_details, output_details
+    model_path = "horse_human_classifier.tflite"
     
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Modelo no encontrado en {model_path}")
     
     try:
-        model = keras.models.load_model(model_path)
-        print("✓ Modelo cargado exitosamente")
-        return model
+        # Cargar el intérprete TFLite
+        interpreter = tf.lite.Interpreter(model_path=model_path)
+        interpreter.allocate_tensors()
+        
+        # Obtener detalles de entrada y salida
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+        
+        print("✓ Modelo TFLite cargado exitosamente")
+        print(f"  Input shape: {input_details[0]['shape']}")
+        print(f"  Output shape: {output_details[0]['shape']}")
+        return interpreter
     except Exception as e:
         print(f"✗ Error al cargar el modelo: {e}")
         raise e
@@ -89,7 +99,8 @@ async def root():
     return {
         "message": "Horse vs Human Classifier API",
         "status": "active",
-        "model_loaded": model is not None,
+        "model_loaded": interpreter is not None,
+        "model_type": "TensorFlow Lite",
         "endpoints": {
             "predict": "/predict - POST con imagen",
             "health": "/health - GET para verificar estado"
@@ -101,24 +112,25 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "model_loaded": model is not None,
+        "model_loaded": interpreter is not None,
+        "model_type": "TensorFlow Lite",
         "tensorflow_version": tf.__version__
     }
 
 @app.post("/predict")
 async def predict_image(file: UploadFile = File(...)):
     """
-    Predecir si una imagen contiene un caballo o un humano
+    Predecir clase de comida
     
     Returns:
-        - class: 0 para caballo, 1 para humano
-        - class_name: "horse" o "human"
+        - class: 0 a 2022 dependiendo de clase
+        - class_name: nombre de la comida
         - confidence: probabilidad de la predicción
         - probabilities: probabilidades para cada clase
     """
     
     # Verificar que el modelo esté cargado
-    if model is None:
+    if interpreter is None:
         raise HTTPException(status_code=500, detail="Modelo no cargado")
     
     # Verificar que sea una imagen
@@ -133,8 +145,10 @@ async def predict_image(file: UploadFile = File(...)):
         # Preprocesar la imagen
         processed_image = preprocess_image(image)
         
-        # Hacer predicción
-        prediction = model.predict(processed_image)
+        # Hacer predicción con TFLite
+        interpreter.set_tensor(input_details[0]['index'], processed_image)
+        interpreter.invoke()
+        prediction = interpreter.get_tensor(output_details[0]['index'])
         
         # Extraer resultados
         probabilities = prediction[0].tolist()
@@ -149,10 +163,6 @@ async def predict_image(file: UploadFile = File(...)):
             "class": predicted_class,
             "class_name": class_name,
             "confidence": confidence,
-            "probabilities": {
-                "horse": probabilities[0],
-                "human": probabilities[1]
-            },
             "image_info": {
                 "filename": file.filename,
                 "content_type": file.content_type,
