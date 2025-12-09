@@ -25,7 +25,7 @@ output_details = None
 def load_model():
     """Cargar el modelo TFLite"""
     global interpreter, input_details, output_details
-    model_path = "horse_human_classifier.tflite"
+    model_path = "1.tflite"
     
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Modelo no encontrado en {model_path}")
@@ -57,7 +57,7 @@ def preprocess_image(image: Image.Image) -> np.ndarray:
     """
     try:
         # Redimensionar a 300x300
-        image = image.resize((300, 300))
+        image = image.resize((192, 192))
         
         # Convertir a RGB si es necesario, luego a array
         if image.mode != 'RGB':
@@ -67,11 +67,11 @@ def preprocess_image(image: Image.Image) -> np.ndarray:
         img_array = np.array(image)
         
         # Extraer solo el canal 0 (como en el notebook)
-        if len(img_array.shape) == 3:
-            img_array = img_array[:, :, 0]
+        #if len(img_array.shape) == 3:
+        #    img_array = img_array[:, :, 0]
         
         # Reshape para que sea (300, 300, 1)
-        img_array = img_array.reshape((300, 300, 1))
+        img_array = img_array.reshape((192, 192, 3))
         
         # Convertir a float32 y normalizar
         img_array = img_array.astype('float32') / 255.0
